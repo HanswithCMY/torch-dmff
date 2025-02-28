@@ -1,6 +1,6 @@
 # DMFF in PyTorch backend
 
-> torch version of ADMP is initialized by Zheng Cheng (AISI).
+> torch version of ADMP is initialized by [Zheng Cheng](https://github.com/zhengcheng233) (AISI).
 
 This package implements the PME method (for monopoles) and the QEq method in [DMFF](https://github.com/deepmodeling/DMFF) with PyTorch, allowing not only GPU-accelerated calculation of PME/QEq methods but also further customization and extension of other PyTorch-based models.
 
@@ -15,6 +15,11 @@ pip install .
 ```
 
 For the unittests, [DMFF](https://github.com/deepmodeling/DMFF) package is required.
+
+## To-do
+
+- [ ] Add examples and corresponding doc
+- [ ] Add unittest for QEq v.s. RuNNer
 
 ## Examples
 
