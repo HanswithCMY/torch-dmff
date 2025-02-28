@@ -5,7 +5,7 @@ import torch
 import torchopt
 from torchopt.diff.implicit import custom_root
 
-from torch_dmff import BaseForceModule
+from torch_dmff.base_force import BaseForceModule
 from torch_dmff.optimizer import update_pr
 from torch_dmff.pme import CoulombForceModule
 from torch_dmff.utils import (

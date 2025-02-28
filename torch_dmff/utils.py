@@ -6,7 +6,7 @@ import torch
 from ase import units
 from scipy import constants
 
-from torch_dmff import DEVICE
+from torch_dmff.env import DEVICE
 
 
 # @torch.jit.script

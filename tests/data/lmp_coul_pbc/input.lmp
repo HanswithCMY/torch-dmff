@@ -1,0 +1,35 @@
+
+# ---------------------- INITIALIZAITION ------------------
+units           metal
+boundary        p p p
+atom_style      full
+
+# --------------------- ATOM DEFINITION ------------------
+read_data       system.data
+
+mass            1 1.0079
+
+
+# --------------------- FORCE FIELDS ---------------------
+kspace_style    pppm 1.0e-4
+kspace_modify   gewald 0.5 mesh 16 16 16
+
+pair_style      coul/long 4.0
+pair_coeff      * *
+
+# --------------------- MD SETTINGS ----------------------
+neighbor        2.0 bin
+neigh_modify    every 1
+
+# print info to screen/log file
+thermo          1
+thermo_style    custom step pe ke etotal
+thermo_modify   format float %15.7f
+fix             thermo_print all print 2 "$(step) $(pe) $(ke) $(etotal)" append thermo.out screen no title "# step pe ke etotal"
+
+# save trajectory to file
+dump            traj all custom 1 dump.lammpstrj id type x y z fx fy fz
+dump_modify     traj sort id format float %15.7f
+
+# --------------------- RUN ------------------------------
+run             0
