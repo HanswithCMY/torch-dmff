@@ -18,3 +18,13 @@ dependencies = [
 ]
 [project.urls]
 Homepage = "https://github.com/ChiahsinChu/torch-dmff"
+
+[project.optional-dependencies]
+test = [
+    "openmm>=7.7.0",
+    "jax>=0.4.1, <=0.4.20",
+    "jaxlib>=0.4.1, <=0.4.20",
+    "freud-analysis==3.0.0",
+    "DMFF @ git+https://github.com/deepmodeling/DMFF.git@devel",
+]
+docs = ["sphinx", "sphinx-rtd-theme"]

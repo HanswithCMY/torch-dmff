@@ -10,8 +10,7 @@ This package can be installed by:
 
 ```bash
 git clone https://github.com/ChiahsinChu/torch-dmff
-cd torch-dmff
-pip install .
+pip install torch-dmff
 ```
 
 For the unittests, [DMFF](https://github.com/deepmodeling/DMFF) package is required.
