@@ -6,16 +6,15 @@ import numpy as np
 import openmm as mm
 import torch
 from ase import io
-from deepmd.pt.utils.utils import to_numpy_array
 from openmm import app
 from openmm.unit import angstrom
 from scipy import constants
 
 from torch_dmff.nblist import TorchNeighborList
 from torch_dmff.pme import CoulombForceModule
-from torch_dmff.utils import calc_grads
+from torch_dmff.utils import calc_grads, to_numpy_array
 
-torch.set_default_dtype(torch.float64)
+# torch.set_default_dtype(torch.float64)
 
 # kJ/mol to eV/particle
 energy_coeff = (

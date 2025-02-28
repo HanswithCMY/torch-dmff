@@ -6,7 +6,7 @@ import torch
 from ase import units
 from scipy import constants
 
-from torch_dmff.env import DEVICE
+from torch_dmff.env import DEVICE, NP_PRECISION_DICT, PT_PRECISION_DICT
 
 
 # @torch.jit.script
@@ -248,3 +248,23 @@ class TorchConstants(torch.nn.Module):
         # kJ/mol
         # DIELECTRIC = torch.tensor(1389.35455846).to(DEVICE)
         # self.dielectric = 1 / (4 * self.pi * self.epsilon) / self.energy_coeff
+
+
+# adapted from deepmd.pt.utils.utils.to_numpy_array
+def to_numpy_array(
+    xx,
+):
+    if xx is None:
+        return None
+    assert xx is not None
+    # Create a reverse mapping of PT_PRECISION_DICT
+    reverse_precision_dict = {v: k for k, v in PT_PRECISION_DICT.items()}
+    # Use the reverse mapping to find keys with the desired value
+    prec = reverse_precision_dict.get(xx.dtype, None)
+    prec = NP_PRECISION_DICT.get(prec, None)
+    if prec is None:
+        raise ValueError(f"unknown precision {xx.dtype}")
+    if xx.dtype == torch.bfloat16:
+        # https://github.com/pytorch/pytorch/issues/109873
+        xx = xx.float()
+    return xx.detach().cpu().numpy().astype(prec)

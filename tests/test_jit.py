@@ -4,15 +4,14 @@ import unittest
 
 import numpy as np
 import torch
-from deepmd.pt.utils.utils import to_numpy_array
 
 from torch_dmff.env import DEVICE
 from torch_dmff.nblist import TorchNeighborList
 from torch_dmff.pme import CoulombForceModule
 from torch_dmff.qeq import GaussianDampingForceModule, QEqForceModule, SiteForceModule
-from torch_dmff.utils import calc_grads
+from torch_dmff.utils import calc_grads, to_numpy_array
 
-torch.set_default_dtype(torch.float64)
+# torch.set_default_dtype(torch.float64)
 
 rcut = 4.0
 ethresh = 1e-5

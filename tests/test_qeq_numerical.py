@@ -5,7 +5,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import torch
-from deepmd.pt.utils.utils import to_numpy_array
 from dmff.admp.qeq import E_site3, E_sr3
 from scipy import constants
 
@@ -16,7 +15,12 @@ from torch_dmff.qeq import (
     SiteForceModule,
     pgrad_optimize,
 )
-from torch_dmff.utils import calc_grads, calc_pgrads, vector_projection_coeff_matrix
+from torch_dmff.utils import (
+    calc_grads,
+    calc_pgrads,
+    to_numpy_array,
+    vector_projection_coeff_matrix,
+)
 
 # @jit_condition()
 # def E_site3(chi, J, q):

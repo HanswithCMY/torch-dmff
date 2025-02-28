@@ -4,9 +4,9 @@ import unittest
 import freud
 import numpy as np
 import torch
-from deepmd.pt.utils.utils import to_numpy_array
 
 from torch_dmff.nblist import TorchNeighborList
+from torch_dmff.utils import to_numpy_array
 
 
 class TestTorchNeighborList(unittest.TestCase):
