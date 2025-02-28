@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch_dmff"
+version = "1.0"
+description = "DMFF in PyTorch backend"
+readme = "README.md"
+license = { file = ".license-header.txt" }
+
+[project.urls]
+Homepage = "https://github.com/ChiahsinChu/torch-dmff"

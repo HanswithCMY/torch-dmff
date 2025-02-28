@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Zhu"
+  given-names: "Jia-Xin"
+  orcid: "https://orcid.org/0000-0002-3471-4728"
+- family-names: "Cheng"
+  given-names: "Zheng"
+- family-names: "Yu"
+  given-names: "Kuang"
+title: "DMFF in PyTorch backend"
+version: 1.0.0a
+date-released: 2025-02-01
+url: "https://github.com/ChiahsinChu/torch-dmff"
