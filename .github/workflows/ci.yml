@@ -26,15 +26,17 @@ jobs:
           pip install .[test]  # Install package with test dependencies
           pip install pytest pytest-cov  # Install coverage-related packages
 
-      - name: Run unittests
-        run: python -m unittest discover tests
-
-      - name: Run tests with coverage
+      - name: Test with pytest
         run: |
-          pip install pytest pytest-cov
-          pytest --cov-branch --cov-report=xml
-
-      - name: Upload coverage reports to Codecov
+          pytest --cov --junitxml=junit.xml
+      # Copy and paste the codecov/test-results-action here
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./junit.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
