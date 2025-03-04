@@ -209,6 +209,8 @@ class QEqForceModule(BaseForceModule):
         units_dict: Optional[Dict] = None,
         damping: bool = True,
         sel: list[int] = None,
+        kappa: Optional[float] = None,
+        spacing: float = 0.0,
     ) -> None:
         BaseForceModule.__init__(self, units_dict)
 
@@ -222,6 +224,8 @@ class QEqForceModule(BaseForceModule):
                 slab_corr=slab_corr,
                 slab_axis=slab_axis,
                 units_dict=units_dict,
+                kappa=kappa,
+                spacing=spacing,
             ),
         }
         if damping:
