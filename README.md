@@ -19,7 +19,7 @@ For the unittests, [DMFF](https://github.com/deepmodeling/DMFF) package is requi
 
 ## To-do
 
-- [ ] Add examples and corresponding doc
+- [ ] Add doc for usage
 - [ ] Add unittest for QEq v.s. RuNNer
 
 ## Examples
