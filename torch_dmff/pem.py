@@ -102,13 +102,55 @@ class PEMGaussianDampingForceModule(GaussianDampingForceModule):
         e_sr_self = torch.sum(pre_self * charges * charges)
         
         e_sr = (e_sr_pair + e_sr_self) * self.const_lib.dielectric
+        potential = calc_grads(e_sr, charges)
+        
+        ####print information detect wrong
+        print("\n===== GAUSSIAN DAMPING POTENTIAL AND PAIR DETAILS =====")
+        print("\n----- POTENTIAL VALUES -----")
+        print("Atom ID | Is Electrode | Charge | Potential")
+        print("-" * 45)
+        for i in range(len(potential)):
+            is_elec = "Yes" if electrode_mask[i] == 1 else "No"
+            print(f"{i:7d} | {is_elec:^12s} | {charges[i].item():6.4f} | {potential[i].item():9.6f}")
+        
+    
+        max_pairs_to_print = 20  
+        print("\n----- PAIR INFORMATION (Sample) -----")
+        print("Pair ID | Atom i | Atom j | i-elec | j-elec | Distance | eta_ij | pre_pair | Contrib")
+        print("-" * 90)
+        
+        
+        pair_contrib = pre_pair * q_i * q_j * safe_inverse(ds, threshold=1e-4) * buffer_scales
+        
+        
+        _, top_indices = torch.sort(torch.abs(pair_contrib), descending=True)
+        top_indices = top_indices[:max_pairs_to_print]
+        
+        for idx in top_indices:
+            i, j = pairs[idx]
+            i_elec = "Yes" if i_is_electrode[idx] else "No"
+            j_elec = "Yes" if j_is_electrode[idx] else "No"
+            print(f"{idx.item():7d} | {i.item():6d} | {j.item():6d} | {i_elec:^6s} | {j_elec:^6s} | "
+                  f"{ds[idx].item()/self.const_lib.length_coeff:8.4f} | {eta_ij[idx].item():6.4f} | "
+                  f"{pre_pair[idx].item():8.4f} | {pair_contrib[idx].item():8.4f}")
+        
+        
+        print("\n----- PAIR TYPE STATISTICS -----")
+        print(f"Total pairs: {len(pairs)}")
+        print(f"Both electrode pairs: {torch.sum(both_electrode).item()}")
+        print(f"i-only electrode pairs: {torch.sum(i_only_electrode).item()}")
+        print(f"j-only electrode pairs: {torch.sum(j_only_electrode).item()}")
+        print(f"No electrode pairs: {torch.sum((~i_is_electrode) & (~j_is_electrode)).item()}")
+        
+        print("\n----- ENERGY COMPONENTS -----")
+        print(f"Pair interaction energy: {e_sr_pair.item()}")
+        print(f"Self interaction energy: {e_sr_self.item()}")
+        print(f"Total energy: {e_sr.item()}")
+        print("================================================\n")
+        
         # eV to user-defined energy unit
         return e_sr / self.const_lib.energy_coeff
-    
-    @staticmethod
-    def eta_piecewise(eta, ds, threshold: float = 1e-4):
-        safe_ratio = torch.where(eta > threshold, ds / eta, torch.ones_like(ds))
-        return torch.where(eta > threshold, torch.erfc(safe_ratio), torch.zeros_like(eta))
+
 
 
 class XMLDataLoadder:

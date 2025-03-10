@@ -87,8 +87,8 @@ class TestPEMModule(unittest.TestCase):
         # Update test data
         self.positions = torch.tensor(positions, requires_grad=True)
         self.box = torch.tensor(box)
-        self.charges = torch.tensor(charges)
-        self.ref_charge = torch.tensor(charges)
+        self.charges = torch.tensor(charges, requires_grad=True)
+        self.ref_charge = torch.tensor(charges, requires_grad=True)
         
         n_atoms = charges.shape[0]
         
@@ -459,7 +459,7 @@ class TestPEMModule(unittest.TestCase):
         forces_ref_charge = self._calculate_forces(rounded_ref_charge)
         forces_calc_charge = self._calculate_forces(rounded_charges)
         # Read LAMMPS reference forces
-        atoms = io.read(str(self.data_root / "conq/system.lammpstrj"))
+        atoms = io.read(str(self.data_root / "conq/system_sp.lammpstrj"))
         ref_force = atoms.get_forces() * FORCE_COEFF
         
         # Extract z-direction forces for comparison
