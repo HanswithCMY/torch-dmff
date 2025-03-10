@@ -5,8 +5,8 @@ import freud
 import numpy as np
 import torch
 
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.utils import to_numpy_array
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.utils import to_numpy_array
 
 
 class TestTorchNeighborList(unittest.TestCase):

@@ -3,7 +3,7 @@ from typing import Optional
 
 import torch
 
-from torch_dmff.spatial import pbc_shift
+from torch_admp.spatial import pbc_shift
 
 
 # todo: fix bug or deprecated this class (for crossing-boundary images)

@@ -8,14 +8,14 @@ import torch
 from dmff.admp.qeq import E_site3, E_sr3
 from scipy import constants
 
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.qeq import (
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.qeq import (
     GaussianDampingForceModule,
     QEqForceModule,
     SiteForceModule,
     pgrad_optimize,
 )
-from torch_dmff.utils import (
+from torch_admp.utils import (
     calc_grads,
     calc_pgrads,
     to_numpy_array,

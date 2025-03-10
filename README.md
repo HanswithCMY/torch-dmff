@@ -1,6 +1,6 @@
 # DMFF in PyTorch backend
 
-[![codecov](https://codecov.io/gh/ChiahsinChu/torch-dmff/graph/badge.svg?token=aBlN5QoejV)](https://codecov.io/gh/ChiahsinChu/torch-dmff)
+[![codecov](https://codecov.io/gh/ChiahsinChu/torch-admp/graph/badge.svg?token=aBlN5QoejV)](https://codecov.io/gh/ChiahsinChu/torch-admp)
 
 > torch version of ADMP is initialized by [Zheng Cheng](https://github.com/zhengcheng233) (AISI).
 
@@ -11,8 +11,8 @@ This package implements the PME method (for monopoles) and the QEq method in [DM
 This package can be installed by:
 
 ```bash
-git clone https://github.com/ChiahsinChu/torch-dmff
-pip install torch-dmff
+git clone https://github.com/ChiahsinChu/torch-admp
+pip install torch-admp
 ```
 
 For the unittests, [DMFF](https://github.com/deepmodeling/DMFF) package is required.
@@ -31,8 +31,8 @@ For the unittests, [DMFF](https://github.com/deepmodeling/DMFF) package is requi
 [openmm-torch](https://github.com/openmm/openmm-torch)
 
 ```python
-from torch_dmff.qeq import QEqAllForceModule
-from torch_dmff.pme import setup_ewald_parameters
+from torch_admp.qeq import QEqAllForceModule
+from torch_admp.pme import setup_ewald_parameters
 
 
 kappa, kx, ky, kz = setup_ewald_parameters(rcut, box)

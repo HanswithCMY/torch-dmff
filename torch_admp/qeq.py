@@ -5,10 +5,10 @@ import torch
 import torchopt
 from torchopt.diff.implicit import custom_root
 
-from torch_dmff.base_force import BaseForceModule
-from torch_dmff.optimizer import update_pr
-from torch_dmff.pme import CoulombForceModule
-from torch_dmff.utils import (
+from torch_admp.base_force import BaseForceModule
+from torch_admp.optimizer import update_pr
+from torch_admp.pme import CoulombForceModule
+from torch_admp.utils import (
     calc_pgrads,
     safe_inverse,
     vector_projection,

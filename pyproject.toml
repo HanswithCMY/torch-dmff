@@ -5,9 +5,9 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "torch_dmff"
+name = "torch_admp"
 version = "1.0"
-description = "DMFF in PyTorch backend"
+description = "ADMP in PyTorch backend"
 readme = "README.md"
 license = { file = ".license-header.txt" }
 dependencies = [
@@ -18,7 +18,7 @@ dependencies = [
     "ase",
 ]
 [project.urls]
-Homepage = "https://github.com/ChiahsinChu/torch-dmff"
+Homepage = "https://github.com/ChiahsinChu/torch-admp"
 
 [project.optional-dependencies]
 test = [

@@ -6,9 +6,9 @@ import numpy as np
 import torch
 from scipy import special
 
-from torch_dmff.base_force import BaseForceModule
-from torch_dmff.recip import bspline, setup_kpts, setup_kpts_integer, spread_charges
-from torch_dmff.utils import safe_inverse
+from torch_admp.base_force import BaseForceModule
+from torch_admp.recip import bspline, setup_kpts, setup_kpts_integer, spread_charges
+from torch_admp.utils import safe_inverse
 
 
 class CoulombForceModule(BaseForceModule):

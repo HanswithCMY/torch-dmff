@@ -8,9 +8,9 @@ from dmff.api import DMFFTopology
 from dmff.api.xmlio import XMLIO
 from scipy import constants
 
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.qeq import QEqForceModule
-from torch_dmff.utils import calc_grads
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.qeq import QEqForceModule
+from torch_admp.utils import calc_grads
 
 torch.set_default_device("cuda")
 torch.set_default_dtype(torch.float64)
