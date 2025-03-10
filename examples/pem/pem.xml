@@ -226,6 +226,6 @@
     </Residue>
   </Residues>
   <ADMPQeqForce coulomb14scale="1.0" DampMod="3">
-    <Atom type="1" chi="0" J="0" eta="0.625"/>
+    <Atom type="1" chi="0" J="0" eta="0.442"/>
   </ADMPQeqForce>
 </ForceField>

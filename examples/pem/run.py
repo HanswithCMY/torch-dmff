@@ -12,19 +12,19 @@ from torch_dmff.qeq import QEqForceModule
 from torch_dmff.utils import calc_grads
 
 from torch_dmff.pem import PEMModule
-from torch_dmff.pem import load_xml
+from torch_dmff.pem import XMLDataLoadder
 
-from torch_dmff.pem import run_poisson_1D
+#from torch_dmff.pem import run_poisson_1D
 
 torch.set_default_device("cuda")
 torch.set_default_dtype(torch.float64)
 
 
 if __name__ == "__main__":
-    rcut = 5.0
-    ethresh = 1e-6
-    module = PEMModule(rcut=rcut,ethresh=ethresh,slab_corr=True)
-    data_dict = load_xml(file_name="pem.xml",pdb_name="pem.pdb",slab_res_list=["left_slab","right_slab"],eletroyte_res_list=["water"],
+    rcut = 6.0
+    ethresh = 1e-5
+    module = PEMModule(rcut=rcut,ethresh=ethresh,slab_corr=False)
+    data_dict = XMLDataLoadder.load_xml(file_name="pem.xml",pdb_name="pem.pdb",slab_res_list=["left_slab","right_slab"],electroyte_res_list=["water"],
                          left_electrode="left_slab",right_electrode="right_slab")
     print(data_dict["charge"])
     positions = torch.tensor(
@@ -71,6 +71,7 @@ if __name__ == "__main__":
         parms,
         potential=np.array([0,4]),
         method="mat_inv",
+        ffield=True,
     )
     ###
     
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     print(energy)
     print("done")
     
-    ###poisson 1D
+'''    ###poisson 1D
     ffield = False
     potential = np.array([0,4])
 
@@ -132,4 +133,4 @@ if __name__ == "__main__":
     with open ("1d_potential_with_charge.csv","w") as f:
         f.write("coordinate,charge_density,phi\n")
         for i in range(len(phi)):
-            f.write(f"{r[i]},{charge_dens_profile[i]},{phi[i]}\n")
+            f.write(f"{r[i]},{charge_dens_profile[i]},{phi[i]}\n")'''
