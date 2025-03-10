@@ -1,6 +1,6 @@
 # DMFF in PyTorch backend
 
-[![codecov](https://codecov.io/gh/ChiahsinChu/torch-admp/graph/badge.svg?token=aBlN5QoejV)](https://codecov.io/gh/ChiahsinChu/torch-admp)
+[![codecov](https://codecov.io/gh/ChiahsinChu/torch_admp/graph/badge.svg?token=9PXNT5XB7C)](https://codecov.io/gh/ChiahsinChu/torch_admp)
 
 > torch version of ADMP is initialized by [Zheng Cheng](https://github.com/zhengcheng233) (AISI).
 
@@ -15,7 +15,12 @@ git clone https://github.com/ChiahsinChu/torch-admp
 pip install torch-admp
 ```
 
-For the unittests, [DMFF](https://github.com/deepmodeling/DMFF) package is required.
+For the unit tests, you can install the package with the following command:
+
+```bash
+git clone https://github.com/ChiahsinChu/torch-admp
+pip install torch-admp[test]
+```
 
 ## To-do
 
