@@ -33,6 +33,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ChiahsinChu/torch_admp
           file: ./coverage.xml
 
       - name: Upload test results to Codecov
