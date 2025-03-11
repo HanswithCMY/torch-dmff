@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 import numpy as np
 import torch
-from dp_dmff.dmff.nblist import TorchNeighborList
-from dp_dmff.dmff.pme import CoulombForceModule
-from dp_dmff.dmff.utils import calc_grads
+from torch_dmff.nblist import TorchNeighborList
+from torch_dmff.pme import CoulombForceModule
+from torch_dmff.utils import calc_grads
 
 torch.set_default_device("cuda")
 torch.set_default_dtype(torch.float64)

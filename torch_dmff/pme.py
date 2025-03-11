@@ -57,7 +57,6 @@ class CoulombForceModule(BaseForceModule):
                 self.kappa = kappa / self.const_lib.length_coeff
             else:
                 self.kappa = 0.0
-        print(f"kappa: {self.kappa}")
         self.ethresh = ethresh
         self.kmesh = torch.ones(3, dtype=torch.long)
         self.spacing = spacing

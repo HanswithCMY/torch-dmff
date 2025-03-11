@@ -2,6 +2,8 @@
 <ForceField>
   <AtomTypes>
     <Type class="metal" element="Pt" mass="195.084" name="1"/>
+    <Type class="water" element="K" mass="39.0983" name="2"/>
+    <Type class="water" element="F" mass="18.998403" name="3"/>
   </AtomTypes>
   <Residues>
     <Residue name="left_slab">
@@ -224,8 +226,14 @@
       <Atom name="Pt107" type="1" charge="0.000000"/>
       <Atom name="Pt108" type="1" charge="0.000000"/>
     </Residue>
+    <Residue name="water">
+      <Atom name="K217" type="2" charge="1.000000"/>
+      <Atom name="F218" type="3" charge="-1.000000"/>
+    </Residue>
   </Residues>
   <ADMPQeqForce coulomb14scale="1.0" DampMod="3">
     <Atom type="1" chi="0" J="0" eta="0.442"/>
+    <Atom type="2" chi="0" J="0" eta="0"/>
+    <Atom type="3" chi="0" J="0" eta="0"/>
   </ADMPQeqForce>
 </ForceField>

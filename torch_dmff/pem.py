@@ -61,17 +61,15 @@ class PEMGaussianDampingForceModule(GaussianDampingForceModule):
         energy: torch.Tensor
             energy tensor
         """
+        ##init charge and position with unit metal
         eta = params["eta"] * self.const_lib.length_coeff
         charges = params["charge"]
-
         ds = ds * self.const_lib.length_coeff
 
-
+        #calculate effective gaussian width for gaussian damping
         q_i = charges[pairs[:, 0]].reshape(-1)
         q_j = charges[pairs[:, 1]].reshape(-1)
-
         electrode_mask = torch.tensor(electrode_mask, dtype=eta.dtype)
-
         i_is_electrode = electrode_mask[pairs[:, 0]] == 1
         j_is_electrode = electrode_mask[pairs[:, 1]] == 1
 
@@ -82,15 +80,14 @@ class PEMGaussianDampingForceModule(GaussianDampingForceModule):
             #2*ij = 2*sqrt(i^2 + j^2)
             eta_ij[both_electrode] = torch.sqrt((eta[pairs[:, 0]][both_electrode]**2 + 
                                                 eta[pairs[:, 1]][both_electrode]**2) * 2) 
-            #eta_ij[both_electrode] = 0
         i_only_electrode = i_is_electrode & (~j_is_electrode)
         if torch.any(i_only_electrode):
                 eta_ij[i_only_electrode] = eta[pairs[:, 0]][i_only_electrode] * (2.0 ** 0.5)
         j_only_electrode = (~i_is_electrode) & j_is_electrode
         if torch.any(j_only_electrode):
                 eta_ij[j_only_electrode] = eta[pairs[:, 1]][j_only_electrode] * (2.0 ** 0.5)
-        #pre_pair = torch.zeros_like(q_i)
         
+        #calculate correction short-range energy(eV)
         pre_pair = -self.eta_piecewise(eta_ij, ds)
             
         e_sr_pair = torch.sum(
@@ -102,8 +99,9 @@ class PEMGaussianDampingForceModule(GaussianDampingForceModule):
         e_sr_self = torch.sum(pre_self * charges * charges)
         
         e_sr = (e_sr_pair + e_sr_self) * self.const_lib.dielectric
-        potential = calc_grads(e_sr, charges)
-        
+    
+
+        '''
         ####print information detect wrong
         print("\n===== GAUSSIAN DAMPING POTENTIAL AND PAIR DETAILS =====")
         print("\n----- POTENTIAL VALUES -----")
@@ -147,13 +145,13 @@ class PEMGaussianDampingForceModule(GaussianDampingForceModule):
         print(f"Self interaction energy: {e_sr_self.item()}")
         print(f"Total energy: {e_sr.item()}")
         print("================================================\n")
-        
+        '''
         # eV to user-defined energy unit
         return e_sr / self.const_lib.energy_coeff
 
 
 
-class XMLDataLoadder:
+class XMLDataLoader:
     """
     data preprocessor for XML file and PDB file
     """
@@ -298,6 +296,8 @@ class PEMModule(QEqForceModule):
                                 damping, sel)
         self.slab_axis = slab_axis
         self.slab_corr = slab_corr
+        self.rcut = rcut
+
         self.models: Dict[str, BaseForceModule] = {
             "coulomb": CoulombForceModule(rcut=rcut, ethresh=ethresh, 
                                           kspace=kspace, rspace=rspace,
@@ -307,6 +307,13 @@ class PEMModule(QEqForceModule):
             "gaussian": PEMGaussianDampingForceModule(units_dict=units_dict),
             }
         self._logger = self._setup_logger()
+        self.efield = 0.0
+        self.conp_flag = False
+        self.conq_flag = False
+        self.ffield_flag = False
+
+        if units_dict != None:
+            self.units_dict = units_dict
     
     def _setup_logger(self):
         import logging
@@ -319,7 +326,7 @@ class PEMModule(QEqForceModule):
             logger.setLevel(logging.INFO)
         return logger
     
-    def conp(
+    def input_data_loader(
         self,
         n_atoms: int,
         electrode_mask: np.ndarray,
@@ -327,13 +334,6 @@ class PEMModule(QEqForceModule):
         box: Optional[torch.Tensor],
         num_electrode_atoms_dict: Dict,
         params: Dict[str, torch.Tensor],
-        potential: np.array,
-        ffield: bool=False,
-        method: str="pgrad", 
-        symm: bool=True,
-        fi_cons_charge: Optional[float]=None,
-        se_cons_charge: Optional[float]=None,
-        conq: bool=False,
         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Constrained Potential Method implementation
@@ -354,165 +354,129 @@ class PEMModule(QEqForceModule):
             number of electrode atoms for each sideelectrode
         params : Dict[str, torch.Tensor]
             parameters for optimization
-        potential : np.array
-            potential information between electrodes, the order is 
-            same with num_electrode_atoms_dict
-        ffield : bool, optional
-            whether the finite field is applied, by default False
-        method : str, 
-            optimization method, by default "pgrad"
-        symm : bool, optional
-            whether the total charge of two electrode is same, by default True
-
-        fi_cons_charge : Optional[float], optional
-            charge constraint for the first electrode, by default None
-        se_cons_charge : Optional[float], optional
-            charge constraint for the second electrode, by default None
-        conq : bool, optional
-            whether the constrained potential method is applied, by default False
 
         """
         if len(num_electrode_atoms_dict) != 2:
             raise KeyError("Only two electrodes are supported Now")
-        if ffield :
-            if self.slab_corr :
-                raise KeyError("Slab correction and finite field cannot be used together")
+
+        self.num_electrode_atoms_dict = num_electrode_atoms_dict
+        self.first_key = list(num_electrode_atoms_dict.keys())[0]
+        self.second_key = list(num_electrode_atoms_dict.keys())[1]
+        self.box = box
+        self.positions = positions
+        self.electrode_mask = electrode_mask
+        self.params = params
+
+        self.charge = params["charge"]
 
         params["chi"] = self.coulomb_potential_add_chi(n_atoms, electrode_mask, positions, box, params["chi"],  params["eta"],params["charge"])
-        
+        self.chi = params["chi"]
 
-        electrode_params = {k: v[electrode_mask == 1] for k, v in params.items()}
-        
-        electrode_positions = positions[electrode_mask == 1]
-        
-       
+        #only consider the electrode atoms
+        self.electrode_params = {k: v[electrode_mask == 1] for k, v in params.items()}        
+        self.electrode_positions = positions[electrode_mask == 1]
+        self.nblist = self.models["nblist"]
+        self.pairs = self.nblist(self.electrode_positions, box)
+        self.ds = self.nblist.get_ds()
+        self.buffer_scales = self.nblist.get_buffer_scales()
 
 
-        nblist = self.models["nblist"]
-        
-        pairs = nblist(electrode_positions, box)
-        ds = nblist.get_ds()
-        buffer_scales = nblist.get_buffer_scales()
-        ##here we impose the constraint that the total charge of the electrode is zero
+    
+    def conp(self,potential: np.array,ffield: bool=False,method: str="pgrad",symm: bool=True,):
+        #Add constant potential condition in chi 
+        self.conp_flag = True
 
-        first_key = list(num_electrode_atoms_dict.keys())[0]
-        second_key = list(num_electrode_atoms_dict.keys())[1]
+        potential_term = torch.cat([
+            torch.full((self.num_electrode_atoms_dict[self.first_key],), potential[0], dtype=torch.float64),
+            torch.full((self.num_electrode_atoms_dict[self.second_key],), potential[1], dtype=torch.float64)
+            ])
+        self.electrode_params["chi"] -= potential_term 
+            
+        if ffield :
+            
+            if self.slab_corr :
+                raise KeyError("Slab correction and finite field cannot be used together")
+            potential_drop = potential[0] - potential[1]
+            self.electrode_params["chi"] = self.finite_field_add_chi(self.num_electrode_atoms_dict, 
+                                                            self.electrode_positions,self.box, self.electrode_params["chi"], potential_drop,self.slab_axis)
+            self.ffield_flag = True
+        #input for optimization
+        args = [
+        self.electrode_positions,
+        self.box,
+        self.electrode_params["chi"],
+        self.electrode_params["hardness"],
+        self.electrode_params["eta"],
+        self.pairs,
+        self.ds,
+        self.buffer_scales,
+        ]
 
         if symm:
-            elec_num = num_electrode_atoms_dict[first_key] + num_electrode_atoms_dict[second_key]
-            constraint_matrix = torch.ones([1, elec_num], dtype=torch.float64)
-            constraint_vals = torch.zeros(1, dtype=torch.float64)
-
-        if fi_cons_charge is not None:
-            if symm:
-                raise KeyError("symm and cons_charge cannot be used together")
-            if se_cons_charge is None:
-                raise KeyError("cons_charge requires both first and second electrode charges")
-            
-            n1 = num_electrode_atoms_dict[first_key] 
-            n2 = num_electrode_atoms_dict[second_key]   
-
-            row1 = torch.cat([torch.ones((1, n1), dtype=torch.float64, device=positions.device),
-                      torch.zeros((1, n2), dtype=torch.float64, device=positions.device)], dim=1)
-
-            row2 = torch.cat([torch.zeros((1, n1), dtype=torch.float64, device=positions.device),
-                      torch.ones((1, n2), dtype=torch.float64, device=positions.device)], dim=1)
-            constraint_matrix = torch.cat([row1, row2], dim=0)
-            constraint_vals = torch.tensor([fi_cons_charge, se_cons_charge], dtype=torch.float64, device=positions.device)
-
-        ##if we have neutral electrode, we can use D to simplify the potential drop vector
-
-
-        ## left electrode - right electrode
-        #if first_key == "r_num_ele":
-            #potential_drop = - potential_drop
-
-        #D = torch.cat([
-        #    torch.full((num_electrode_atoms_dict[first_key],), num_electrode_atoms_dict[first_key]/elec_num, dtype=torch.float64),
-        #    torch.full((num_electrode_atoms_dict[second_key],), - num_electrode_atoms_dict[second_key]/elec_num, dtype=torch.float64)
-        #    ])
-        #potential_term = potential_drop * D
-        if not conq:
-
-            potential_term = torch.cat([
-            torch.full((num_electrode_atoms_dict[first_key],), potential[0], dtype=torch.float64),
-            torch.full((num_electrode_atoms_dict[second_key],), potential[1], dtype=torch.float64)
-            ])
-            electrode_params["chi"] -= potential_term 
-            
-            if ffield:
-                potential_drop = potential[0] - potential[1]
-                electrode_params["chi"] = self.finite_field_add_chi(n_atoms, electrode_mask,num_electrode_atoms_dict, 
-                                                      electrode_positions, "None", "None",
-                                                      box, electrode_params["chi"], potential_drop,self.slab_axis)
-                
-
-        
-        args = [
-        electrode_positions,
-        box,
-        electrode_params["chi"],
-        electrode_params["hardness"],
-        electrode_params["eta"],
-        pairs,
-        ds,
-        buffer_scales,
-        ]
-        
-        if constraint_matrix is not None:
+            ##here we impose the constraint that the total charge of the electrode is zero
+            elec_num = self.num_electrode_atoms_dict[self.first_key] + self.num_electrode_atoms_dict[self.second_key]
+            constraint_matrix = torch.ones([1, elec_num])
+            constraint_vals = torch.zeros(1)
             args.append(constraint_matrix)
-        if constraint_vals is not None:
             args.append(constraint_vals)
 
         if method == "pgrad":
-            args.insert(0, electrode_params["charge"])
-
+            args.insert(0, self.electrode_params["charge"])
             energy, q_opt = self.solve_pgrad(*args)
         if method == "mat_inv":
-            energy, q_opt, hessian_diag, fermi = self.solve_matrix_inversion(*args)            
-        #print("QEq converges in %d step(s)" % self.converge_iter)
-
-        charges = params["charge"].clone()
-        charges[electrode_mask == 1] = q_opt
-
-        ###compute the energy and force for entire system
-        nblist = self.models["nblist"]
-        pairs = nblist(positions, box)
-        ds = nblist.get_ds()
-        buffer_scales = nblist.get_buffer_scales()
-        module = self.models["coulomb"]
-        energy = module(positions, box, pairs, ds, buffer_scales, {"charge": charges})
-        '''
-        module = self.models["gaussian"]
-        energy += module(electrode_mask, positions, box, pairs, ds, buffer_scales, {"charge": charges, "eta": params["eta"]})
-        '''
-        forces = -calc_grads(energy, positions)
-        
-
-        return energy, forces, charges
+            energy, q_opt, hessian_diag, fermi = self.solve_matrix_inversion(*args)      
+        charges = self.params["charge"].clone()     
+        charges[self.electrode_mask == 1] = q_opt
+        self.charge_opt = torch.tensor(charges, requires_grad=True)
+        return self.charge_opt
     
-    def conq(self,
-        n_atoms: int,
-        electrode_mask: np.array,
-        positions: torch.Tensor,
-        box: Optional[torch.Tensor],
-        num_electrode_atoms_dict: Dict,
-        params: Dict[str, torch.Tensor],
-        potential: np.array=[],
-        ffield: bool=False,
-        method: str="pgrad", 
-        symm: bool=False,
-        fi_cons_charge: float=None,
-        se_cons_charge: float=None,
-        conq: bool=True,
-        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-            if fi_cons_charge is None or se_cons_charge is None:
-                raise KeyError("conq requires both first and second electrode charges")
-            return self.conp(
-                n_atoms, electrode_mask, positions, box, num_electrode_atoms_dict, 
-                params, potential, ffield, method, symm, fi_cons_charge, 
-                se_cons_charge, conq
-            ) 
+    def conq(self,fi_cons_charge: float=None,se_cons_charge: float=None,ffield: bool=False,method: str="pgrad"):
+        self.conq_flag = True
+
+        if fi_cons_charge is None and se_cons_charge is None:
+            raise KeyError("conq requires both first or second electrode charges constraints")
+        n1 = self.num_electrode_atoms_dict[self.first_key] 
+        n2 = self.num_electrode_atoms_dict[self.second_key]   
+        if se_cons_charge is None or fi_cons_charge is None:
+            if se_cons_charge is None:
+                con_charge = fi_cons_charge
+            else:
+                con_charge = se_cons_charge
+            n = n1 + n2
+            constraint_matrix = torch.ones([1, n])
+            constraint_vals = torch.tensor([con_charge])
+        else:
+            row1 = torch.cat([torch.ones((1, n1)),torch.zeros((1, n2))], dim=1)
+            row2 = torch.cat([torch.zeros((1, n1)),torch.ones((1, n2))], dim=1)
+            constraint_matrix = torch.cat([row1, row2], dim=0)
+            constraint_vals = torch.tensor([fi_cons_charge, se_cons_charge])
+        if ffield:
+            raise KeyError("conq with finite field has not been implemented")
+        
+        args = [
+        self.electrode_positions,
+        self.box,
+        self.electrode_params["chi"],
+        self.electrode_params["hardness"],
+        self.electrode_params["eta"],
+        self.pairs,
+        self.ds,
+        self.buffer_scales,
+        ]        
+        args.append(constraint_matrix)
+        args.append(constraint_vals)
+        if method == "pgrad":
+            args.insert(0, self.electrode_params["charge"])
+            energy, q_opt = self.solve_pgrad(*args)
+        if method == "mat_inv":
+            energy, q_opt, hessian_diag, fermi = self.solve_matrix_inversion(*args)
+        charges = self.params["charge"].clone()
+        charges[self.electrode_mask == 1] = q_opt
+        self.charge_opt = torch.tensor(charges, requires_grad=True)
+
+        return self.charge_opt 
+    
+
     
     def calc_coulomb_potential(self, 
                                electrode_mask : np.array,
@@ -530,88 +494,19 @@ class PEMModule(QEqForceModule):
         pairs = nblist(positions, box)
         ds = nblist.get_ds()
         buffer_scales = nblist.get_buffer_scales()
+
         module = self.models["coulomb"]
         energy = module(positions, box, pairs, ds, buffer_scales, {"charge": charges})
-
-        potential =  calc_grads(energy, charges)
         module = self.models["gaussian"]
-        energy_gaussian = module(electrode_mask, positions, box, pairs, ds, buffer_scales, {"charge": charges, "eta": eta})
-        potential_gaussian = calc_grads(energy_gaussian, charges)
-        #potential =  calc_grads(energy, charges)
+        energy += module(electrode_mask, positions, box, pairs, ds, buffer_scales, {"charge": charges, "eta": eta})
+        #user-defined energy unit to eV 
+        energy =  energy * self.const_lib.energy_coeff
         
-        #return potential + potential_gaussian
-        return potential + potential_gaussian
+        potential =  calc_grads(energy, charges)
+
+        return potential 
     
-    '''
-    def calc_coulomb_potential(self, 
-                           electrode_mask: np.array,
-                           positions: torch.Tensor, 
-                           box: torch.Tensor, 
-                           charges: torch.tensor,
-                           eta: torch.tensor
-                           ):
-        """
-    Calculate the Coulomb potential for the system, including electrostatic interactions 
-    and Gaussian short-range corrections for electrodes.
-    
-    Parameters:
-    -----------
-    electrode_mask: np.array
-        Binary array indicating which atoms are part of electrodes
-    positions: torch.Tensor
-        Atom coordinates
-    box: torch.Tensor
-        Simulation box dimensions
-    charges: torch.tensor
-        Atomic charges
-    eta: torch.tensor
-        Gaussian width parameters for short-range corrections
-        
-    Returns:
-    --------
-    torch.Tensor
-        Electrostatic potential at each atom site
-        """
-        # Calculate neighbor pairs and distances
-        nblist = self.models["nblist"]
-        pairs = nblist(positions, box)
-        ds = nblist.get_ds()
-        buffer_scales = nblist.get_buffer_scales()
-    
-        # Method 1: Diagnostic calculation to separately analyze contributions 
-        # from Coulomb and Gaussian terms (for debugging/analysis only)
-        with torch.no_grad():  # Use no_grad to prevent gradient accumulation
-            module = self.models["coulomb"]
-            coulomb_energy = module(positions, box, pairs, ds, buffer_scales, {"charge": charges})
-            print(f"Before gaussian energy: {coulomb_energy}")
-        
-            # Create temporary copy to calculate Coulomb potential separately
-            # without affecting the main computation graph
-            temp_charges = charges.clone().detach().requires_grad_(True)
-            temp_params = {"charge": temp_charges}
-            temp_energy = module(positions, box, pairs, ds, buffer_scales, temp_params)
-            coulomb_potential = calc_grads(temp_energy, temp_charges)
-            print(f"Before Potential: {coulomb_potential}")
-    
-        # Method 2: Calculate the complete potential (recommended approach)
-        # Reset main computation and start from scratch
-        module_coulomb = self.models["coulomb"]
-        module_gaussian = self.models["gaussian"]
-    
-        # Use fresh parameter dictionary to ensure clean computation graph
-        params = {"charge": charges, "eta": eta}
-    
-        # Calculate total energy (Coulomb + Gaussian correction)
-        total_energy = module_coulomb(positions, box, pairs, ds, buffer_scales, {"charge": charges})
-        total_energy += module_gaussian(electrode_mask, positions, box, pairs, ds, buffer_scales, params)
-        print(f"After gaussian energy: {total_energy}")
-    
-        # Calculate gradients only once on the total energy
-        potential = calc_grads(total_energy, charges)
-        print(f"After Potential: {potential}")
-    
-        return potential
-    '''
+
     def coulomb_potential_add_chi(self, 
                                   n_atoms: int,
                                   electrode_mask : np.array, 
@@ -630,17 +525,12 @@ class PEMModule(QEqForceModule):
         return potential + chi
 
     def finite_field_add_chi(self,
-                             n_atoms: int,
-                             electrode_mask : np.array, 
                              num_electrode_atoms_dict: Dict,
                              electrode_positions : torch.tensor,
-                             left_electrode : str,
-                             right_electrode : str, 
                              box : torch.Tensor, 
                              chi : torch.Tensor,
                              potential_drop: float,
                              slab_axis: int = 2,
-                             
                              ):
         """
         Compute the correction term for the finite field
@@ -655,24 +545,49 @@ class PEMModule(QEqForceModule):
                 electrode_positions[:num_electrode_atoms_dict[first_key],slab_axis])
         max_pos_second = torch.max(
                 electrode_positions[num_electrode_atoms_dict[first_key]:,slab_axis])
-        
-        lz = box[slab_axis][2]
-        
+        #only valid for orthogonality cell
+        lz = box[slab_axis][slab_axis]
+        normalized_positions = electrode_positions[:, slab_axis] / lz
         ### lammps fix electrode implementation
         ### cos180(-1) or cos0(1) for E(delta_psi/(r1-r2)) and r
         if max_pos_first > max_pos_second:
-            first_part = electrode_positions[:num_electrode_atoms_dict[first_key], slab_axis]/lz
-            second_part = electrode_positions[num_electrode_atoms_dict[first_key]:, slab_axis]/lz 
-
-            zprd_offset = -1 * -1 * torch.cat([first_part, second_part], dim=0)
+            zprd_offset = -1 * -1 * normalized_positions
+            self.efield = -1 * potential_drop / lz
         else:
-            first_part = electrode_positions[:num_electrode_atoms_dict[first_key], slab_axis]/lz 
-            second_part = electrode_positions[num_electrode_atoms_dict[first_key]:, slab_axis]/lz 
-            zprd_offset = -1 * torch.cat([first_part, second_part], dim=0)
+            zprd_offset = -1 * normalized_positions
+            self.efield = potential_drop / lz
         
      
         potential =  potential_drop * zprd_offset
         return potential + chi
+    def Coulomb_Calculator(self):
+        """
+        Compute the Coulomb force for the system
+        """
+        # Set up neighbor list
+        nblist = TorchNeighborList(cutoff=self.rcut)
+        pairs = nblist(self.positions, self.box)
+        ds = nblist.get_ds()
+        buffer_scales = nblist.get_buffer_scales()
+
+        # calculate point charge force
+        if self.conp_flag or self.conq_flag:
+            charge = self.charge_opt
+        else:
+            charge = self.charge
+
+        module = self.models["coulomb"]
+        energy = module(self.positions, self.box, pairs, ds, buffer_scales, {"charge": charge})
+        module = self.models["gaussian"]
+        energy += module(self.electrode_mask, self.positions, self.box, pairs, ds, buffer_scales, {"charge": charge, "eta": self.params["eta"]})
+
+        forces = -calc_grads(energy, self.positions)
+
+        if self.ffield_flag:
+            forces += self.efield * charge.unsqueeze(1) * torch.tensor([0, 0, 1])
+        
+
+        return energy, forces
 
 
 class PoissonSolver:

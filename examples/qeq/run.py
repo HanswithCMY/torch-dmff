@@ -6,9 +6,9 @@ import openmm.unit as unit
 import torch
 from dmff.api import DMFFTopology
 from dmff.api.xmlio import XMLIO
-from dp_dmff.dmff.nblist import TorchNeighborList
-from dp_dmff.dmff.qeq import QEqForceModule
-from dp_dmff.dmff.utils import calc_grads
+from torch_dmff.nblist import TorchNeighborList
+from torch_dmff.qeq import QEqForceModule
+from torch_dmff.utils import calc_grads
 from scipy import constants
 
 torch.set_default_device("cuda")
