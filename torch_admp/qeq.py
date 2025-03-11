@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
-from typing import Callable, Dict, Optional, Tuple, Union, List
+from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
 import torchopt
@@ -352,11 +352,21 @@ class QEqForceModule(BaseForceModule):
         buffer_scales: torch.Tensor,
     ):
         n_atoms = positions.shape[0]
-        q_tmp = torch.zeros(n_atoms, device=positions.device, dtype=torch.float64)
+        q_tmp = torch.zeros(
+            n_atoms, device=positions.device, dtype=torch.float64, requires_grad=True
+        )
         # calculate hessian
-        hessian = torch.func.hessian(self.func_energy)(
+        # hessian = torch.func.hessian(self.func_energy)(
+        #     q_tmp, positions, box, chi, hardness, eta, pairs, ds, buffer_scales
+        # )
+        y = self.func_energy(
             q_tmp, positions, box, chi, hardness, eta, pairs, ds, buffer_scales
         )
+        grad = torch.autograd.grad(y, q_tmp, retain_graph=True, create_graph=True)
+        hessian = []
+        for anygrad in grad[0]:
+            hessian.append(torch.autograd.grad(anygrad, q_tmp, retain_graph=True)[0])
+        hessian = torch.stack(hessian)
         return hessian.reshape([n_atoms, n_atoms])
 
     @torch.jit.ignore
