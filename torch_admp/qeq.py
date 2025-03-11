@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple, Union, List
 
 import torch
 import torchopt
@@ -210,7 +210,7 @@ class QEqForceModule(BaseForceModule):
         damping: bool = True,
         sel: list[int] = None,
         kappa: Optional[float] = None,
-        spacing: float = 0.0,
+        spacing: Optional[List[float]] = None,
     ) -> None:
         BaseForceModule.__init__(self, units_dict)
 
