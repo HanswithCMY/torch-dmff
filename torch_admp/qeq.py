@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple, Union, List
 
 import torch
 import torchopt
 from torchopt.diff.implicit import custom_root
 
-from torch_dmff.base_force import BaseForceModule
-from torch_dmff.optimizer import update_pr
-from torch_dmff.pme import CoulombForceModule
-from torch_dmff.utils import (
+from torch_admp.base_force import BaseForceModule
+from torch_admp.optimizer import update_pr
+from torch_admp.pme import CoulombForceModule
+from torch_admp.utils import (
     calc_pgrads,
     safe_inverse,
     vector_projection,
@@ -209,6 +209,8 @@ class QEqForceModule(BaseForceModule):
         units_dict: Optional[Dict] = None,
         damping: bool = True,
         sel: list[int] = None,
+        kappa: Optional[float] = None,
+        spacing: Optional[List[float]] = None,
     ) -> None:
         BaseForceModule.__init__(self, units_dict)
 
@@ -222,6 +224,8 @@ class QEqForceModule(BaseForceModule):
                 slab_corr=slab_corr,
                 slab_axis=slab_axis,
                 units_dict=units_dict,
+                kappa=kappa,
+                spacing=spacing,
             ),
         }
         if damping:

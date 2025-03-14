@@ -10,9 +10,9 @@ from openmm import app
 from openmm.unit import angstrom
 from scipy import constants
 
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.pme import CoulombForceModule
-from torch_dmff.utils import calc_grads, to_numpy_array
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.pme import CoulombForceModule
+from torch_admp.utils import calc_grads, to_numpy_array
 
 # torch.set_default_dtype(torch.float64)
 

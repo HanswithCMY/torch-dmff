@@ -5,11 +5,11 @@ import unittest
 import numpy as np
 import torch
 
-from torch_dmff.env import DEVICE
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.pme import CoulombForceModule
-from torch_dmff.qeq import GaussianDampingForceModule, QEqForceModule, SiteForceModule
-from torch_dmff.utils import calc_grads, to_numpy_array
+from torch_admp.env import DEVICE
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.pme import CoulombForceModule
+from torch_admp.qeq import GaussianDampingForceModule, QEqForceModule, SiteForceModule
+from torch_admp.utils import calc_grads, to_numpy_array
 
 # torch.set_default_dtype(torch.float64)
 

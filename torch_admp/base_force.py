@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 import torch
 
-from torch_dmff.utils import TorchConstants
+from torch_admp.utils import TorchConstants
 
 
 class BaseForceModule(torch.nn.Module, ABC):

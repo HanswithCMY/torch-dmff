@@ -6,7 +6,7 @@ import torch
 from ase import units
 from scipy import constants
 
-from torch_dmff.env import DEVICE, NP_PRECISION_DICT, PT_PRECISION_DICT
+from torch_admp.env import DEVICE, NP_PRECISION_DICT, PT_PRECISION_DICT
 
 
 # @torch.jit.script

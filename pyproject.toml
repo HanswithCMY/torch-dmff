@@ -5,26 +5,29 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "torch_dmff"
+name = "torch_admp"
 version = "1.0"
-description = "DMFF in PyTorch backend"
+description = "ADMP in PyTorch backend"
 readme = "README.md"
 license = { file = ".license-header.txt" }
 dependencies = [
     "torch>=2.1.0",
     "torchopt==0.7.3",
-    "numpy>=1.20.0",
+    "numpy>=1.20.0, <2.0",
     "scipy>=1.6.0",
+    "ase",
 ]
 [project.urls]
-Homepage = "https://github.com/ChiahsinChu/torch-dmff"
+Homepage = "https://github.com/ChiahsinChu/torch-admp"
 
 [project.optional-dependencies]
 test = [
+    "pytest",
+    "pytest-cov",
     "openmm>=7.7.0",
     "jax>=0.4.1, <=0.4.20",
     "jaxlib>=0.4.1, <=0.4.20",
     "freud-analysis==3.0.0",
-    "DMFF @ git+https://github.com/deepmodeling/DMFF.git@devel",
+    "DMFF @ git+https://github.com/ChiahsinChu/DMFF.git@devel",
 ]
 docs = ["sphinx", "sphinx-rtd-theme"]

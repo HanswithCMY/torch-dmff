@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 import math
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union, List
 
 import numpy as np
 import torch
 from scipy import special
 
-from torch_dmff.base_force import BaseForceModule
-from torch_dmff.recip import bspline, setup_kpts, setup_kpts_integer, spread_charges
-from torch_dmff.utils import safe_inverse
+from torch_admp.base_force import BaseForceModule
+from torch_admp.recip import bspline, setup_kpts, setup_kpts_integer, spread_charges
+from torch_admp.utils import safe_inverse
 
 
 class CoulombForceModule(BaseForceModule):
@@ -44,7 +44,7 @@ class CoulombForceModule(BaseForceModule):
         units_dict: Optional[Dict] = None,
         sel: list[int] = None,
         kappa: Optional[float] = None,
-        spacing: float = 0.0,
+        spacing: Optional[List[float]] = None,
     ) -> None:
         BaseForceModule.__init__(self, units_dict)
 
@@ -59,7 +59,10 @@ class CoulombForceModule(BaseForceModule):
                 self.kappa = 0.0
         self.ethresh = ethresh
         self.kmesh = torch.ones(3, dtype=torch.long)
-        self.spacing = spacing
+        if spacing is not None:
+            self.spacing = torch.tensor(np.array(spacing), dtype=torch.float64)
+        else:
+            self.spacing = spacing
         self.rspace_flag = rspace
         self.slab_corr_flag = slab_corr
         self.slab_axis = slab_axis
@@ -202,7 +205,7 @@ class CoulombForceModule(BaseForceModule):
         device = positions.device
 
         box_inv = torch.linalg.inv(box)
-        if self.spacing > 0:
+        if self.spacing is not None:
             self.kmesh = torch.ceil(box.diagonal() / self.spacing).to(torch.long)
         else:
             self.kmesh = torch.ceil(
