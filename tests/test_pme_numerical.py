@@ -26,6 +26,7 @@ energy_coeff = (
 force_coeff = energy_coeff * constants.angstrom / constants.nano
 
 
+
 class TestOpenMMSimulation:
     def __init__(self) -> None:
         self.rcut = 5.0
