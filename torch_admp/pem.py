@@ -4,15 +4,15 @@ import torch
 
 
 
-from torch_dmff.base_force import BaseForceModule
-from torch_dmff.utils import calc_grads
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.pme import CoulombForceModule
-from torch_dmff.qeq import GaussianDampingForceModule
-from torch_dmff.qeq import pgrad_optimize
+from torch_admp.base_force import BaseForceModule
+from torch_admp.utils import calc_grads
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.pme import CoulombForceModule
+from torch_admp.qeq import GaussianDampingForceModule
+from torch_admp.qeq import pgrad_optimize
 from .qeq import QEqForceModule
 
-from torch_dmff.utils import safe_inverse
+from torch_admp.utils import safe_inverse
 
 class PEMGaussianDampingForceModule(GaussianDampingForceModule):
     def __init__(
