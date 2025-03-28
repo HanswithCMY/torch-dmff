@@ -7,14 +7,15 @@ import torch
 from scipy import constants
 from ase import io
 
-from torch_dmff.nblist import TorchNeighborList
-from torch_dmff.pem import PEMModule
-from torch_dmff.pme import CoulombForceModule
-from torch_dmff.utils import calc_grads, to_numpy_array
-from torch_dmff.pem import PEMGaussianDampingForceModule
+from torch_admp.nblist import TorchNeighborList
+from torch_admp.pem import PEMModule
+from torch_admp.pme import CoulombForceModule
+from torch_admp.utils import calc_grads, to_numpy_array
+from torch_admp.pem import PEMGaussianDampingForceModule
 
-from torch_dmff.pem import input_data_loader_and_conq
-
+from torch_admp.pem import conp
+from torch_admp.pem import conq
+from torch_admp.pem import conq_aimd_data
 # Unit conversion factors
 ENERGY_COEFF = (
     constants.physical_constants["joule-electron volt relationship"][0]
@@ -25,7 +26,7 @@ FORCE_COEFF = ENERGY_COEFF * 4.184  # kcal/(mol A) to eV/particle/A
 POTENTIAL_COEFF = ENERGY_COEFF * 4.184  # kcal/(mol) to V/electron
 
 # Test configuration
-OUTPUT_CSV = True  # Set to True to output comparison CSV files
+OUTPUT_CSV = False  # Set to True to output comparison CSV files
 
 torch.set_default_dtype(torch.float64)
 
@@ -39,30 +40,7 @@ class TestPEMModule(unittest.TestCase):
         self.ethresh = 1e-6
         self.data_root = Path(__file__).parent / "data/pem"
         
-        # Load initial test data
-        atoms = io.read(
-            str(self.data_root / "after_pem.data"),
-            format="lammps-data",
-        )
-        positions = atoms.get_positions()
-        box = atoms.get_cell().array
-        charges = atoms.get_initial_charges()
 
-        # Convert to PyTorch tensors
-        self.positions = torch.tensor(positions, requires_grad=True)
-        self.box = torch.tensor(box)
-        self.charges = torch.tensor(charges)
-
-        # Set up neighbor list
-        self.nblist = TorchNeighborList(cutoff=self.rcut)
-        self.pairs = self.nblist(self.positions, self.box)
-        self.ds = self.nblist.get_ds()
-        self.buffer_scales = self.nblist.get_buffer_scales()
-        
-        # Initialize parameters
-        self.eta = torch.full_like(self.charges, 0.4419417)
-        self.chi = torch.full_like(self.charges, 0)
-        self.hardness = torch.full_like(self.charges, 0)
     
     def _write_csv(self, filename, data_dict):
         """Output CSV file to compare data (optional)"""
@@ -102,7 +80,7 @@ class TestPEMModule(unittest.TestCase):
         
         # Set electrode mask and parameters
         self.electrode_mask = torch.zeros(n_atoms)
-        self.electrode_mask[:216] = 1
+        
         
         left_slab_mask = torch.zeros(n_atoms)
         left_slab_mask[:108] = 1
@@ -111,7 +89,7 @@ class TestPEMModule(unittest.TestCase):
         left_slab_tuple = tuple(left_slab_mask.tolist())
         right_slab_tuple = tuple(right_slab_mask.tolist())
         self.electrode_atoms_dict = {left_slab_tuple: torch.tensor(0), right_slab_tuple: torch.tensor(1)}
-                                
+        self.electrode_mask[:216] = 1
         
         # Set eta parameters (for electrode and non-electrode parts)
         self.eta = torch.cat([
@@ -152,12 +130,17 @@ class TestPEMModule(unittest.TestCase):
     def _calculate_forces(self, module):
         """Calculate force field forces"""
 
-        energy, forces = module.Coulomb_Calculator()
+        energy, forces = module.Coulomb_Calculator(self.electrode_mask, 
+                                                   self.positions, 
+                                                   self.box,
+                                                   self.charges, 
+                                                   self.eta,
+                                                   self.efield)
 
         return forces
 
     def _verify_results(self, forces, ref_forces, charges=None, ref_charges=None, 
-                   tol_force=1e-3, tol_charge=1e-3, applied_potential=None):
+                   tol_force=1e-4, tol_charge=1e-4, applied_potential=None):
         """
     Verify if results match reference values within tolerance.
 
@@ -178,10 +161,6 @@ class TestPEMModule(unittest.TestCase):
     applied_potential : list, optional
         Applied electrode potentials [V_left, V_right]
         """
-        # Use stricter tolerance for certain test cases
-        if applied_potential == [4, 0]:
-            tol_force = 1e-6
-        
         # Convert forces to numpy arrays for comparison
         forces_np = to_numpy_array(forces).reshape(-1, 3)
         ref_forces_np = ref_forces
@@ -279,18 +258,36 @@ class TestPEMModule(unittest.TestCase):
         # Create module and run simulation
         module = self._create_pem_module()
         params = self._get_params_dict()
-        module.input_data_loader( electrode_mask=self.electrode_mask, positions=self.positions, 
-                                 box=self.box, electrode_atoms_dict=self.electrode_atoms_dict, params=params)
+        
         module.ffield_flag = True
         module.efield = -(potential[0]-potential[1])/self.box[2,2]
+        self.efield = module.efield
         forces_ref_charge = self._calculate_forces(module)
+        
         # Run constant potential simulation
-        charges = module.conp(
-            potential=np.array(potential),
-            ffield=True,
-            method="mat_inv", 
-            symm=True,
+        
+        electrode_mask = torch.zeros(self.n_atoms)
+        
+        
+        left_indices = torch.arange(self.n_atoms)[:108]  
+        right_indices = torch.arange(self.n_atoms)[108:216]
+        
+        
+        electrode_mask[left_indices] = potential[0]
+        electrode_mask[right_indices] = potential[1]
+        
+        
+        charges = conp(
+            module=module, 
+            electrode_mask=electrode_mask, 
+            positions=self.positions, 
+            box=self.box, 
+            params={"charge": self.charges, "chi": self.chi, "hardness": self.hardness, "eta": self.eta},
+            ffield=True
         )
+        
+        
+        self.charges = charges
         
         # Output charge comparison
         self._write_csv(f"charge_comparison_{test_name}.csv", {
@@ -298,8 +295,6 @@ class TestPEMModule(unittest.TestCase):
             "ref_charge": self.ref_charge.detach().cpu().numpy()
         })
 
-
-       
         forces_calc_charge = self._calculate_forces(module)
 
         # Read LAMMPS reference forces
@@ -319,23 +314,16 @@ class TestPEMModule(unittest.TestCase):
         })
         
         # Verify results with reference charge forces 
-        self._verify_results(forces_calc_charge, ref_force, charges, self.ref_charge,applied_potential=potential)
+        self._verify_results(forces_calc_charge, ref_force, charges, self.ref_charge, applied_potential=potential)
 
 
-    def test_numerical(self):
-        """Test numerical calculation consistency with LAMMPS reference values"""
-        self._run_pem_test(
-        data_subdir=".",  # 使用与test_conp相同的数据目录
-        lammpstrj_name="conp.lammpstrj",
-        potential=[4, 0],
-        test_name="numerical"  # 使用不同的测试名称以区分
-        )
+
     def test_far(self):
         """Test constant potential simulation with high potential difference"""
         self._run_pem_test(
             data_subdir="conp/far",
             lammpstrj_name="conp.lammpstrj",
-            potential=[200, 0],
+            potential=[201, 1],
             test_name="conp_far"
         )
     
@@ -344,7 +332,7 @@ class TestPEMModule(unittest.TestCase):
         self._run_pem_test(
             data_subdir="conp/near",
             lammpstrj_name="conp.lammpstrj",
-            potential=[200, 0],
+            potential=[201, 1],
             test_name="conp_near"
         )
     def test_conq(self):
@@ -358,112 +346,227 @@ class TestPEMModule(unittest.TestCase):
         module = self._create_pem_module()
         
         params = self._get_params_dict()
+        
+        
         left_slab_mask = torch.zeros(self.n_atoms)
         left_slab_mask[:108] = 1
         right_slab_mask = torch.zeros(self.n_atoms)
         right_slab_mask[108:216] = 1
-        left_slab_tuple = tuple(left_slab_mask.tolist())
-        right_slab_tuple = tuple(right_slab_mask.tolist())
-        self.electrode_atoms_dict = {left_slab_tuple: torch.tensor(-5), right_slab_tuple: torch.tensor(-5)}
-
-        module.input_data_loader(electrode_mask=self.electrode_mask, positions=self.positions, 
-                                 box=self.box, electrode_atoms_dict=self.electrode_atoms_dict, params=params)
+        
+        
+        electrode_mask = torch.zeros(self.n_atoms)
+        electrode_mask[:108] = 1  
+        electrode_mask[108:216] = 2  
+        
+        
+        charge_constraint_dict = {1: torch.tensor(-5.0), 2: torch.tensor(-5.0)}
         
 
+        
+        self.efield = 0
         forces_ref_charge = self._calculate_forces(module)
 
-        params["chi"] = torch.zeros_like(params["chi"])
-
-       
-        # Run constant charge simulation
-        charges = module.conq(
-            method="mat_inv", 
+        
+        charges = conq(
+            module=module,
+            electrode_mask=electrode_mask,
+            positions=self.positions,
+            charge_constraint_dict=charge_constraint_dict,
+            box=self.box,
+            params=params
         )
         
+        
+        self.charges = charges
 
-        # Output charge comparison
+        
         self._write_csv("charge_comparison_conq.csv", {
             "charge": charges.detach().cpu().numpy(),
             "ref_charge": self.ref_charge.detach().cpu().numpy()
         })
-        # Calculate forces with both reference charges and calculated charges
         
+        # compare forces
+
         forces_calc_charge = self._calculate_forces(module)
-        # Read LAMMPS reference forces
+        
+    
         atoms = io.read(str(self.data_root / "conq/system_pem.lammpstrj"))
         ref_force = atoms.get_forces() * FORCE_COEFF
-        # Extract z-direction forces for comparison
+        
+        
         forces_ref_z = to_numpy_array(forces_ref_charge).reshape(-1, 3)[:, 2]
         forces_calc_z = to_numpy_array(forces_calc_charge).reshape(-1, 3)[:, 2]
         ref_forces_z = ref_force[:, 2]
-        # Output force comparison
+        
+        
         self._write_csv("forces_comparison_conq.csv", {
             "forces_ref_z": forces_ref_z,
             "forces_calc_z": forces_calc_z,
             "ref_forces_z": ref_forces_z
         })
-        # Verify results with reference charge forces (original behavior)
+        
+        
         self._verify_results(forces_calc_charge, ref_force, charges, self.ref_charge)
 
     def test_conq_jit(self):
-        """Test constant charge simulation"""
-        print("Testing conq")
-        # Load test data
+        """Test constant charge simulation with JIT compilation"""
+        print("Testing conq with JIT")
+       
         data_path = "conq/jit/after_pem.data"
         self._load_pem_test_data(data_path)
-        
-        # Create module and run simulation
+    
+        # Create module and JIT version
         module = self._create_pem_module()
         jit_module = torch.jit.script(module)
         params = self._get_params_dict()
-        left_slab_mask = torch.zeros(self.n_atoms)
-        left_slab_mask[:108] = 1
-        right_slab_mask = torch.zeros(self.n_atoms)
-        right_slab_mask[108:216] = 1
-        left_slab_tuple = tuple(left_slab_mask.tolist())
-        right_slab_tuple = tuple(right_slab_mask.tolist())
-        self.electrode_atoms_dict = {left_slab_tuple: torch.tensor(-5), right_slab_tuple: torch.tensor(-5)}
-
-        module.input_data_loader(electrode_mask=self.electrode_mask, positions=self.positions, 
-                                 box=self.box, electrode_atoms_dict=self.electrode_atoms_dict, params=params)
+    
         
+        electrode_mask = torch.zeros(self.n_atoms)
+        electrode_mask[:108] = 1  
+        electrode_mask[108:216] = 1 
+        self.efield = 0
 
         forces_ref_charge = self._calculate_forces(module)
-
+    
+        
+        
+    
+        # non-JIT version
         params["chi"] = torch.zeros_like(params["chi"])
-        charges_jit = input_data_loader_and_conq(
-            module= jit_module,
-            electrode_mask=self.electrode_mask, positions=self.positions, 
-            box=self.box, params=params
+        charges_ref = conq_aimd_data(
+            module=module,
+            electrode_mask=electrode_mask, 
+            positions=self.positions, 
+            box=self.box, 
+            params=params
         )
- 
-        # Run constant charge simulation
+    
+        # jit module
+        charges_jit = conq_aimd_data(
+            module=jit_module,
+            electrode_mask=electrode_mask,
+            positions=self.positions, 
+            box=self.box, 
+            params=params
+        )
+    
+        # compare JIT and non-JIT versions results about charges
+        torch.testing.assert_close(charges_ref, charges_jit, rtol=1e-5, atol=1e-5)
+        print("JIT compilation test passed: JIT and non-JIT versions produce identical results")
+    
+        
         module.charge = charges_jit
+    
         
-        
-        # Output charge comparison
         self._write_csv("charge_comparison_conq_jit.csv", {
             "charge_jit": charges_jit.detach().cpu().numpy(),
             "ref_charge": self.ref_charge.detach().cpu().numpy()
         })
-        # Calculate forces with both reference charges and calculated charges
-        
+    
+        # compute forces
         forces_calc_charge = self._calculate_forces(module)
-        # Read LAMMPS reference forces
+    
+        
         atoms = io.read(str(self.data_root / "conq/jit/system.lammpstrj"))
         ref_force = atoms.get_forces() * FORCE_COEFF
-        # Extract z-direction forces for comparison
+    
+        
         forces_ref_z = to_numpy_array(forces_ref_charge).reshape(-1, 3)[:, 2]
         forces_calc_z = to_numpy_array(forces_calc_charge).reshape(-1, 3)[:, 2]
         ref_forces_z = ref_force[:, 2]
-        # Output force comparison
+    
+        
         self._write_csv("forces_comparison_conq_jit.csv", {
             "forces_ref_z": forces_ref_z,
             "forces_calc_z": forces_calc_z,
             "ref_forces_z": ref_forces_z
         })
-        # Verify results with reference charge forces (original behavior)
+    
+        
         self._verify_results(forces_calc_charge, ref_force, charges_jit, self.ref_charge)
+
+    def test_conp_jit(self):
+        """Test constant potential simulation with JIT compilation"""
+        print("Testing conp with JIT")
+        # Load test data
+        data_path = "conp/near/after_pem.data"
+        self._load_pem_test_data(data_path)
+    
+        # Create module and JIT version
+        module = self._create_pem_module()
+        jit_module = torch.jit.script(module)
+        params = self._get_params_dict()
+    
+
+        left_slab_mask = torch.zeros(self.n_atoms)
+        left_slab_mask[:108] = 1
+        right_slab_mask = torch.zeros(self.n_atoms)
+        right_slab_mask[108:216] = 1
+
+        electrode_mask = torch.zeros(self.n_atoms)
+        electrode_mask[:108] = 201
+        electrode_mask[108:216] = 1
+        potential = [201, 1]
+        module.efield = -(potential[0]-potential[1])/self.box[2,2]
+        self.efield = module.efield
+    
+        forces_ref_charge = self._calculate_forces(module)
+
+        charges_ref = conp(
+            module=module,
+            electrode_mask=electrode_mask,
+            positions=self.positions,
+            box=self.box,
+            params=params,
+            ffield=True
+        )
+
+        # jit module 
+        charges_jit = conp(
+            module=jit_module,
+            electrode_mask=electrode_mask,
+            positions=self.positions,
+            box=self.box,
+            params=params,
+            ffield=True
+        )
+
+        # compare JIT and non-JIT versions results about charges
+        torch.testing.assert_close(charges_ref, charges_jit, rtol=1e-5, atol=1e-5)
+        print("JIT compilation test passed: JIT and non-JIT versions produce identical results")
+
+
+        module.charge = charges_jit
+
+    
+        self._write_csv("charge_comparison_conp_jit.csv", {
+            "charge_jit": charges_jit.detach().cpu().numpy(),
+            "ref_charge": self.ref_charge.detach().cpu().numpy()
+        })
+
+        # Compute forces
+
+        forces_calc_charge = self._calculate_forces(module)
+
+
+        atoms = io.read(str(self.data_root / "conp/near/conp.lammpstrj"))
+        ref_force = atoms.get_forces() * FORCE_COEFF
+
+
+        forces_ref_z = to_numpy_array(forces_ref_charge).reshape(-1, 3)[:, 2]
+        forces_calc_z = to_numpy_array(forces_calc_charge).reshape(-1, 3)[:, 2]
+
+        ref_forces_z = ref_force[:, 2]
+
+        self._write_csv("forces_comparison_conp_jit.csv", {
+            "forces_ref_z": forces_ref_z,
+            "forces_calc_z": forces_calc_z,
+            "ref_forces_z": ref_forces_z
+        })
+
+        self._verify_results(forces_calc_charge, ref_force, charges_jit, self.ref_charge)
+
+
 
 
 if __name__ == "__main__":

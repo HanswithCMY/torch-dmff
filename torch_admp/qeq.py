@@ -72,6 +72,7 @@ class GaussianDampingForceModule(BaseForceModule):
         q_j = charges[pairs[:, 1]].reshape(-1)
 
         eta_ij = torch.sqrt((eta[pairs[:, 0]] ** 2 + eta[pairs[:, 1]] ** 2) * 2)
+        eta_ij[eta_ij == 0] = 1e-10
         pre_pair = -self.eta_piecewise(eta_ij, ds)
         e_sr_pair = torch.sum(
             pre_pair * q_i * q_j * safe_inverse(ds, threshold=1e-4) * buffer_scales
@@ -160,8 +161,8 @@ class SiteForceModule(BaseForceModule):
         chi = params["chi"] * self.const_lib.energy_coeff
         hardness = params["hardness"] * self.const_lib.energy_coeff
         charges = params["charge"]
-
         e = chi * charges + hardness * charges**2
+
         return torch.sum(e) / self.const_lib.energy_coeff
 
 
@@ -878,7 +879,7 @@ def pgrad_optimize(
     """
     n_atoms = positions.shape[0]
     # n_const = constraint_matrix.shape[0]
-
+    
     if q0 is None:
         q0 = torch.rand(n_atoms, device=positions.device, dtype=torch.float64)
         reinit_q = True
@@ -886,10 +887,10 @@ def pgrad_optimize(
     # make sure the initial guess satisfy constraints
     if reinit_q:
         q0 = vector_projection(q0, constraint_matrix, constraint_vals)
-
+    
     if coeff_matrix is None:
         coeff_matrix = vector_projection_coeff_matrix(constraint_matrix)
-
+    
     # choose iterative algorithm
     try:
         solver_fn = globals()[f"_pgrad_optimize_{method}"](
@@ -897,7 +898,6 @@ def pgrad_optimize(
         )
     except KeyError:
         raise ValueError(f"Method {method} is not supported.")
-
     out = custom_root(
         module.optimality,
         argnums=1,
